@@ -226,7 +226,11 @@
         Add extra nodes here (optional). When you click <b>Load Dashboard</b>, the first one becomes <b>Primary</b>.
       </div>
 
+      <div class="hintline">
+        <span class="ok">Primary (default)</span>
+        <span class="mono" id="defaultNodeLabel"></span>
 
+      </div>
 
       <div style="margin-top:10px">
         <textarea id="nodes" spellcheck="false"
@@ -322,7 +326,7 @@ https://backup-node.workers.dev"></textarea>
 
 <script>
 /**
- * ✅ HARD CODED DEFAULT PRIMARY (hidden)
+ * ✅ DEFAULT PRIMARY 
  */
 const DEFAULT_PRIMARY = "https://balancechain-node.rr-rshemodel.workers.dev";
 document.getElementById("defaultNodeLabel").textContent = DEFAULT_PRIMARY + "/";
@@ -355,12 +359,7 @@ function getUserNodes(){
   return [...new Set(lines.map(normNode))];
 }
 
-/**
- * ✅ YOUR REQUIRED RULE:
- * - Page load => use DEFAULT_PRIMARY as primary (auto load)
- * - If user adds endpoints + clicks Load => FIRST user endpoint becomes primary
- *   and DEFAULT_PRIMARY becomes a cross-check node automatically.
- */
+
 function computeNodes(){
   const user = getUserNodes();
   if(user.length === 0) return [DEFAULT_PRIMARY];
