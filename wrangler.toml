@@ -11,7 +11,7 @@ database_id = "REPLACE_WITH_YOUR_D1_ID"
 [vars]
 CHAIN_ID = "balancechain-main"
 # TODO: set your real genesis UTC (milliseconds since epoch)
-GENESIS_UTC_MS = "1767225600000"
+GENESIS_UTC_MS = "1736565605"
 MAX_FUTURE_SKEW_MS = "120000"
 MAX_BATCH = "500"
 INITIAL_UNLOCKED = "1200"
