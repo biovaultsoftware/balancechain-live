@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>BalanceChain Explorer</title>
   <meta name="color-scheme" content="dark light">
+
   <style>
     :root{
       --bg:#0b1220;
@@ -55,6 +56,7 @@
     }
     h1{margin:0;font-size:28px;letter-spacing:.2px}
     .subtitle{color:var(--muted);font-size:13px;margin-top:6px}
+
     .pill{
       display:inline-flex;align-items:center;gap:8px;
       padding:8px 10px;border:1px solid var(--border);
@@ -130,9 +132,6 @@
       background:rgba(255,255,255,.03);
       font-weight:600;
     }
-    button.ghost{
-      background:transparent;
-    }
 
     .kv{
       display:grid;
@@ -196,6 +195,14 @@
     @media (max-width: 640px){
       .split{grid-template-columns:1fr}
     }
+    .hintline{
+      display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+      padding:10px 12px;border-radius:12px;border:1px solid var(--border);
+      background:rgba(255,255,255,.02);
+      margin-top:10px;
+      color:var(--muted);
+      font-size:12px;
+    }
   </style>
 </head>
 
@@ -208,20 +215,34 @@
     </div>
     <div class="pill" id="topPill">
       <span class="dot warn"></span>
-      <span id="topStatus">Not loaded</span>
+      <span id="topStatus">Auto-loading…</span>
     </div>
   </header>
 
   <div class="grid">
     <div class="card">
       <h2>Node Endpoints</h2>
-      <div class="muted small">One per line. First node = primary. Others are cross-check nodes.</div>
-      <div style="margin-top:10px">
-        <textarea id="nodes" spellcheck="false" placeholder="https://node1.workers.dev
-https://node2.workers.dev"></textarea>
+      <div class="muted small">
+        Add extra nodes here (optional). When you click <b>Load Dashboard</b>, the first one becomes <b>Primary</b>.
       </div>
+
+      <div class="hintline">
+        <span class="ok">Primary (default)</span>
+        <span class="mono" id="defaultNodeLabel"></span>
+        <span class="muted2">· hidden / auto-loaded on page open</span>
+      </div>
+
+      <div style="margin-top:10px">
+        <textarea id="nodes" spellcheck="false"
+          placeholder="(Optional) Add endpoints here…
+Example:
+https://another-node.workers.dev
+https://backup-node.workers.dev"></textarea>
+      </div>
+
       <div class="row" style="margin-top:10px">
         <button id="load">Load Dashboard</button>
+        <button class="secondary" id="reset">Reset to Default</button>
         <button class="secondary" id="quickTest">Quick Test</button>
         <span class="muted" id="status"></span>
       </div>
@@ -231,7 +252,7 @@ https://node2.workers.dev"></textarea>
 
     <div class="card" id="global">
       <h2>Network Summary</h2>
-      <div class="muted">Load dashboard to see chain info and totals.</div>
+      <div class="muted">Auto-loading default primary…</div>
     </div>
   </div>
 
@@ -262,7 +283,7 @@ https://node2.workers.dev"></textarea>
     <div class="row space">
       <div>
         <h2 style="margin:0">Accounts</h2>
-        <div class="muted small">Accounts are listed from the primary node; other nodes are used only for mismatch detection (when data exists).</div>
+        <div class="muted small">Accounts are listed from the primary node; other nodes are used only for mismatch detection.</div>
       </div>
       <div class="row">
         <button class="secondary" id="prev">Prev</button>
@@ -283,14 +304,33 @@ https://node2.workers.dev"></textarea>
         </thead>
         <tbody></tbody>
       </table>
+
       <div class="muted2 small" style="margin-top:10px">
         Tip: click a row to open account summary.
       </div>
     </div>
   </div>
+
+  <!-- TVM / Caps (C) — Future-ready panel -->
+  <div class="card" style="margin-top:14px">
+    <h2>TVM / Caps Layer (C)</h2>
+    <div class="muted small">
+      This panel becomes active once your node returns TVM fields (e.g. tvm_value, yearly_cap, she_ecf, gdp_anchor).
+    </div>
+    <div id="tvmPanel" style="margin-top:10px" class="muted2 small">
+      Waiting for TVM fields from /v1/explorer/stats…
+    </div>
+  </div>
+
 </div>
 
 <script>
+/**
+ * ✅ HARD CODED DEFAULT PRIMARY (hidden)
+ */
+const DEFAULT_PRIMARY = "https://balancechain-node.rr-rshemodel.workers.dev";
+document.getElementById("defaultNodeLabel").textContent = DEFAULT_PRIMARY + "/";
+
 let cursor = 0;
 let limit = 50;
 
@@ -314,9 +354,30 @@ function normNode(u){
   return u.trim().replace(/\/+$/,'');
 }
 
-function getNodes(){
+function getUserNodes(){
   const lines = ($('nodes').value || '').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   return [...new Set(lines.map(normNode))];
+}
+
+/**
+ * ✅ YOUR REQUIRED RULE:
+ * - Page load => use DEFAULT_PRIMARY as primary (auto load)
+ * - If user adds endpoints + clicks Load => FIRST user endpoint becomes primary
+ *   and DEFAULT_PRIMARY becomes a cross-check node automatically.
+ */
+function computeNodes(){
+  const user = getUserNodes();
+  if(user.length === 0) return [DEFAULT_PRIMARY];
+
+  const primary = user[0];
+  const rest = user.slice(1);
+
+  // Add DEFAULT_PRIMARY as cross-check if not already present
+  const nodes = [primary, ...rest];
+  if(primary !== DEFAULT_PRIMARY && !nodes.includes(DEFAULT_PRIMARY)){
+    nodes.push(DEFAULT_PRIMARY);
+  }
+  return nodes;
 }
 
 async function api(node, path){
@@ -333,25 +394,33 @@ async function safeApi(node, path){
   catch (e) { return { ok:false, error:String(e.message||e) }; }
 }
 
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
 function renderHealth(health){
   const el = $('health');
   if(health.length===0){
-    el.innerHTML = '<div class="muted">Add at least 1 node endpoint.</div>';
+    el.innerHTML = '<div class="muted">No nodes.</div>';
     return;
   }
-  const rows = health.map(h=>{
+
+  const rows = health.map((h,i)=> {
+    const role = (i===0) ? `<span class="ok">PRIMARY</span>` : `<span class="muted2">CHECK</span>`;
     const st = h.ok ? `<span class="ok">OK</span>` : `<span class="bad">DOWN</span>`;
     const meta = h.ok
       ? `<span class="muted">genesis ${fmtMs(h.data.genesis_utc_ms)} · chain <span class="mono">${h.data.chain_id}</span> · schema <span class="mono">${h.data.schema}</span></span>`
-      : `<span class="muted">${h.error}</span>`;
-    return `<div class="mono">${st} ${h.node} <span style="margin-left:8px">${meta}</span></div>`;
+      : `<span class="muted">${escapeHtml(h.error)}</span>`;
+
+    return `<div class="mono">${role} · ${st} ${escapeHtml(h.node)} <span style="margin-left:8px">${meta}</span></div>`;
   }).join('');
+
   el.innerHTML = `<details open><summary>Node health</summary><div style="margin-top:10px">${rows}</div></details>`;
 }
 
 function countMismatchesById(primaryList, otherLists){
-  // For now: mismatch = account_id exists in one list but not another (simple)
-  // When you later add richer fields, you can compare more.
   const mismById = new Map();
   const primSet = new Set(primaryList.map(a=>a.account_id));
   for(const a of primaryList) mismById.set(a.account_id, 0);
@@ -367,30 +436,46 @@ function countMismatchesById(primaryList, otherLists){
   return mismById;
 }
 
+function renderTVM(stats){
+  // Future-proof:
+  // If node returns { tvm_value, gdp_anchor, she_ecf, yearly_cap, ... } we show them.
+  const tvm = stats.tvm_value ?? stats.tvm ?? null;
+  const gdp = stats.gdp_anchor ?? stats.gdp ?? null;
+  const she = stats.she_ecf ?? stats.ecf ?? null;
+
+  if(tvm === null && gdp === null && she === null){
+    $('tvmPanel').textContent = "No TVM fields returned yet. Add them to /v1/explorer/stats and this panel will auto-populate.";
+    return;
+  }
+
+  $('tvmPanel').innerHTML = `
+    <div class="kv">
+      <b>tvm_value</b> <span class="mono">${escapeHtml(String(tvm ?? "—"))}</span>
+      <b>gdp_anchor</b> <span class="mono">${escapeHtml(String(gdp ?? "—"))}</span>
+      <b>she_ecf</b> <span class="mono">${escapeHtml(String(she ?? "—"))}</span>
+      <b>yearly_cap</b> <span class="mono">${escapeHtml(String(stats.yearly_cap ?? "—"))}</span>
+    </div>
+    <div class="muted2 small" style="margin-top:8px">This is a view-only layer. Logic stays in your node.</div>
+  `;
+}
+
 async function loadDashboard(){
-  const nodes = getNodes();
+  const nodes = computeNodes();
   $('status').textContent = 'Loading...';
   setTop('Loading…', 'warn');
 
-  const health = await Promise.all(nodes.map(async (n)=>{
+  const health = await Promise.all(nodes.map(async (n)=> {
     const r = await safeApi(n, '/v1/node/info');
     if(r.ok) return { node:n, ok:true, data:r.data };
     return { node:n, ok:false, error:r.error };
   }));
   renderHealth(health);
 
-  if(nodes.length===0){
-    $('status').textContent = '';
-    setTop('No nodes', 'bad');
-    $('global').innerHTML = `<h2>Network Summary</h2><div class="muted">Add node endpoints to begin.</div>`;
-    return;
-  }
-
-  const stats = await Promise.all(nodes.map(async (n)=>({ node:n, ...(await safeApi(n, '/v1/explorer/stats')) })));
+  const stats = await Promise.all(nodes.map(async (n)=> ({ node:n, ...(await safeApi(n, '/v1/explorer/stats')) })));
   const primary = stats[0];
 
   if(!primary.ok){
-    $('global').innerHTML = `<h2>Network Summary</h2><div class="bad">Primary node is down</div><div class="muted">${primary.error}</div>`;
+    $('global').innerHTML = `<h2>Network Summary</h2><div class="bad">Primary node is down</div><div class="muted">${escapeHtml(primary.error)}</div>`;
     $('status').textContent = '';
     setTop('Primary down', 'bad');
     return;
@@ -406,12 +491,12 @@ async function loadDashboard(){
   $('global').innerHTML = `
     <h2>Network Summary</h2>
     <div class="kv">
-      <b>Primary node</b> <span class="mono">${primary.node}</span>
-      <b>chain_id</b> <span class="mono">${primary.data.chain_id}</span>
-      <b>genesis</b> <span class="mono">${fmtMs(primary.data.genesis_utc_ms)}</span>
+      <b>Primary node</b> <span class="mono">${escapeHtml(primary.node)}</span>
+      <b>chain_id</b> <span class="mono">${escapeHtml(primary.data.chain_id)}</span>
+      <b>genesis</b> <span class="mono">${escapeHtml(fmtMs(primary.data.genesis_utc_ms))}</span>
       <b>accounts</b> <span>${primary.data.total_accounts} ${mism ? `<span class="bad"> · mismatch on ${mism} node(s)</span>` : `<span class="ok"> · consistent</span>`}</span>
       <b>segments</b> <span>${primary.data.total_segments}</span>
-      <b>now</b> <span class="mono">${fmtMs(primary.data.now_ms)}</span>
+      <b>now</b> <span class="mono">${escapeHtml(fmtMs(primary.data.now_ms))}</span>
       <b>caps</b> <span class="mono">initial ${primary.data.initial_unlocked} · yearly ${primary.data.yearly_cap}</span>
     </div>
     <details>
@@ -420,20 +505,22 @@ async function loadDashboard(){
     </details>
   `;
 
+  // TVM layer display
+  renderTVM(primary.data);
+
   cursor = 0;
   await loadAccounts();
+
   $('status').textContent = 'OK';
   setTop('Healthy', 'ok');
 }
 
 async function loadAccounts(){
-  const nodes = getNodes();
-  if(nodes.length===0) return;
-
+  const nodes = computeNodes();
   $('cursor').textContent = String(cursor);
   $('limit').textContent = String(limit);
 
-  const page = await Promise.all(nodes.map(async (n)=>({ node:n, ...(await safeApi(n, `/v1/explorer/accounts?limit=${limit}&cursor=${cursor}`)) })));
+  const page = await Promise.all(nodes.map(async (n)=> ({ node:n, ...(await safeApi(n, `/v1/explorer/accounts?limit=${limit}&cursor=${cursor}`)) })));
   const primary = page[0];
   const tbody = $('tbl').querySelector('tbody');
   tbody.innerHTML = '';
@@ -448,7 +535,7 @@ async function loadAccounts(){
   const mismById = countMismatchesById(primaryAccounts, otherLists);
 
   if(primaryAccounts.length === 0){
-    tbody.innerHTML = `<tr><td colspan="4" class="muted">No accounts yet. Register accounts via /v1/account/register to populate.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="muted">No accounts yet.</td></tr>`;
     return;
   }
 
@@ -470,12 +557,12 @@ async function loadAccounts(){
 }
 
 async function viewAccount(accountId){
-  const nodes = getNodes();
+  const nodes = computeNodes();
   if(!accountId){ $('account').innerHTML=''; return; }
 
   $('account').innerHTML = `<div class="muted">Loading…</div>`;
 
-  const results = await Promise.all(nodes.map(async (n)=>({ node:n, ...(await safeApi(n, `/v1/explorer/accounts/${encodeURIComponent(accountId)}/summary`)) })));
+  const results = await Promise.all(nodes.map(async (n)=> ({ node:n, ...(await safeApi(n, `/v1/explorer/accounts/${encodeURIComponent(accountId)}/summary`)) })));
 
   const okSummaries = results.filter(r=>r.ok).map(r=>r.data);
   const mism = (okSummaries.length > 1)
@@ -501,27 +588,21 @@ async function viewAccount(accountId){
   }).join('');
 
   $('account').innerHTML = `
-    <div class="row" style="gap:12px;align-items:flex-start">
-      <div class="stack" style="flex:1">
-        <div><b>account_id:</b> <span class="mono">${escapeHtml(accountId)}</span>
-          ${mism ? `<span class="bad"> · mismatch on ${mism} node(s)</span>` : `<span class="ok"> · consistent</span>`}
-        </div>
-        <details open>
-          <summary>Across nodes</summary>
-          <div style="margin-top:10px">${rows}</div>
-        </details>
-      </div>
+    <div><b>account_id:</b> <span class="mono">${escapeHtml(accountId)}</span>
+      ${mism ? `<span class="bad"> · mismatch on ${mism} node(s)</span>` : `<span class="ok"> · consistent</span>`}
     </div>
-    <div class="muted2 small" style="margin-top:10px">
-      Note: this Explorer shows <b>state</b> only (no history). For richer balances/caps per person, add those fields to your node’s account summary response.
-    </div>
+    <details open>
+      <summary>Across nodes</summary>
+      <div style="margin-top:10px">${rows}</div>
+    </details>
   `;
 }
 
 async function lookupSerial(){
-  const nodes = getNodes();
+  const nodes = computeNodes();
   const origin = $('serialOrigin').value.trim();
   const no = $('serialNo').value.trim();
+
   if(!origin || no===''){
     $('serialOut').innerHTML = '<span class="muted">Enter origin_account_id and segment_no</span>';
     return;
@@ -529,10 +610,8 @@ async function lookupSerial(){
 
   $('serialOut').innerHTML = `<div class="muted">Loading…</div>`;
 
-  // FIXED endpoint + params for your Worker:
   const path = `/v1/explorer/serial?origin_account_id=${encodeURIComponent(origin)}&segment_no=${encodeURIComponent(no)}`;
-
-  const results = await Promise.all(nodes.map(async (n)=>({ node:n, ...(await safeApi(n, path)) })));
+  const results = await Promise.all(nodes.map(async (n)=> ({ node:n, ...(await safeApi(n, path)) })));
 
   const found = results.filter(r=>r.ok && r.data.segment).map(r=>r.data.segment);
   let mism = 0;
@@ -579,29 +658,33 @@ async function lookupSerial(){
 }
 
 async function quickTest(){
-  const nodes = getNodes();
-  if(nodes.length === 0){
-    setTop('No nodes', 'bad');
-    return;
-  }
+  const nodes = computeNodes();
   setTop('Testing…', 'warn');
   const r = await safeApi(nodes[0], '/v1/node/info');
   if(r.ok) setTop('Primary reachable', 'ok');
   else setTop('Primary failed', 'bad');
 }
 
-function escapeHtml(s){
-  return String(s ?? '').replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[c]));
-}
-
+/** Buttons */
 $('load').onclick = loadDashboard;
 $('quickTest').onclick = quickTest;
+$('reset').onclick = async ()=>{
+  $('nodes').value = "";
+  cursor = 0;
+  await loadDashboard();
+};
 $('next').onclick = async ()=>{ cursor += limit; await loadAccounts(); };
 $('prev').onclick = async ()=>{ cursor = Math.max(0, cursor - limit); await loadAccounts(); };
 $('viewAccount').onclick = ()=>viewAccount($('accountSearch').value.trim());
 $('serialBtn').onclick = lookupSerial;
+
+/**
+ * ✅ AUTO LOAD on page open (your requirement)
+ */
+window.addEventListener("DOMContentLoaded", async ()=>{
+  await loadDashboard();
+});
 </script>
+
 </body>
 </html>
