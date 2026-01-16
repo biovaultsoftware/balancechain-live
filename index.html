@@ -195,13 +195,36 @@
     @media (max-width: 640px){
       .split{grid-template-columns:1fr}
     }
-    .hintline{
-      display:flex;gap:10px;flex-wrap:wrap;align-items:center;
-      padding:10px 12px;border-radius:12px;border:1px solid var(--border);
-      background:rgba(255,255,255,.02);
+
+    /* Graph UI */
+    .bars{display:flex;flex-direction:column;gap:8px}
+    .barRow{display:grid;grid-template-columns: 160px 1fr 70px;gap:10px;align-items:center}
+    .barTrack{height:12px;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:rgba(255,255,255,.02)}
+    .barFill{height:100%;background:linear-gradient(90deg, rgba(106,168,255,.55), rgba(143,106,255,.45));}
+    .gridHeat{
+      display:grid;
+      gap:8px;
       margin-top:10px;
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:rgba(255,255,255,.02);
+      padding:12px;
+    }
+    .heatCell{
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:8px 10px;
+      background:rgba(255,255,255,.02);
+      font-size:12px;
+    }
+    .pillMini{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+      background:rgba(255,255,255,.02);
       color:var(--muted);
       font-size:12px;
+      margin-right:8px;
     }
   </style>
 </head>
@@ -226,11 +249,7 @@
         Add extra nodes here (optional). When you click <b>Load Dashboard</b>, the first one becomes <b>Primary</b>.
       </div>
 
-      <div class="hintline">
-        <span class="ok">Primary (default)</span>
-        <span class="mono" id="defaultNodeLabel"></span>
-
-      </div>
+      <!-- ✅ DEFAULT PRIMARY LABEL REMOVED COMPLETELY (hidden hardcoded) -->
 
       <div style="margin-top:10px">
         <textarea id="nodes" spellcheck="false"
@@ -311,25 +330,54 @@ https://backup-node.workers.dev"></textarea>
     </div>
   </div>
 
-  <!-- TVM / Caps (C) — Future-ready panel -->
+  <!-- ✅ Segment Ownership Graph -->
   <div class="card" style="margin-top:14px">
-    <h2>TVM / Caps Layer (C)</h2>
-    <div class="muted small">
-      This panel becomes active once your node returns TVM fields (e.g. tvm_value, yearly_cap, she_ecf, gdp_anchor).
+    <div class="row space">
+      <div>
+        <h2 style="margin:0">Segment Ownership Graph</h2>
+        <div class="muted small">Origin → current owner map · owner distribution · heat matrix · top holders</div>
+      </div>
+      <div class="row">
+        <button class="secondary" id="refreshSegments">Refresh</button>
+        <span class="tag">segments loaded: <span id="segCount" class="mono">0</span></span>
+      </div>
     </div>
-    <div id="tvmPanel" style="margin-top:10px" class="muted2 small">
-      Waiting for TVM fields from /v1/explorer/stats…
+
+    <div id="segStatus" class="muted2 small" style="margin-top:10px">Waiting…</div>
+
+    <div class="split" style="margin-top:12px">
+      <div>
+        <div class="pillMini"><b class="muted">Top holders</b></div>
+        <div id="leaders" style="margin-top:10px"></div>
+      </div>
+
+      <div>
+        <div class="pillMini"><b class="muted">Owner distribution</b></div>
+        <div id="dist" style="margin-top:10px"></div>
+      </div>
     </div>
+
+    <details style="margin-top:14px" open>
+      <summary>Origin → Current owner map</summary>
+      <div id="originMap" style="margin-top:10px"></div>
+    </details>
+
+    <details style="margin-top:14px">
+      <summary>Heat matrix (origin x current_owner)</summary>
+      <div id="heat" class="gridHeat"></div>
+    </details>
+
+    <details style="margin-top:14px">
+      <summary>Raw segments (primary)</summary>
+      <pre id="rawSeg" class="mono" style="margin-top:10px;white-space:pre-wrap;color:var(--muted)"></pre>
+    </details>
   </div>
 
 </div>
 
 <script>
-/**
- * ✅ DEFAULT PRIMARY 
- */
+/** ✅ HARD CODED DEFAULT PRIMARY (fully hidden) */
 const DEFAULT_PRIMARY = "https://balancechain-node.rr-rshemodel.workers.dev";
-document.getElementById("defaultNodeLabel").textContent = DEFAULT_PRIMARY + "/";
 
 let cursor = 0;
 let limit = 50;
@@ -359,7 +407,12 @@ function getUserNodes(){
   return [...new Set(lines.map(normNode))];
 }
 
-
+/**
+ * ✅ RULE:
+ * - Page load => DEFAULT_PRIMARY is primary (auto load)
+ * - If user adds endpoints + clicks Load => FIRST user endpoint becomes primary
+ *   and DEFAULT_PRIMARY becomes cross-check node automatically.
+ */
 function computeNodes(){
   const user = getUserNodes();
   if(user.length === 0) return [DEFAULT_PRIMARY];
@@ -367,7 +420,6 @@ function computeNodes(){
   const primary = user[0];
   const rest = user.slice(1);
 
-  // Add DEFAULT_PRIMARY as cross-check if not already present
   const nodes = [primary, ...rest];
   if(primary !== DEFAULT_PRIMARY && !nodes.includes(DEFAULT_PRIMARY)){
     nodes.push(DEFAULT_PRIMARY);
@@ -401,17 +453,14 @@ function renderHealth(health){
     el.innerHTML = '<div class="muted">No nodes.</div>';
     return;
   }
-
   const rows = health.map((h,i)=> {
     const role = (i===0) ? `<span class="ok">PRIMARY</span>` : `<span class="muted2">CHECK</span>`;
     const st = h.ok ? `<span class="ok">OK</span>` : `<span class="bad">DOWN</span>`;
     const meta = h.ok
       ? `<span class="muted">genesis ${fmtMs(h.data.genesis_utc_ms)} · chain <span class="mono">${h.data.chain_id}</span> · schema <span class="mono">${h.data.schema}</span></span>`
       : `<span class="muted">${escapeHtml(h.error)}</span>`;
-
     return `<div class="mono">${role} · ${st} ${escapeHtml(h.node)} <span style="margin-left:8px">${meta}</span></div>`;
   }).join('');
-
   el.innerHTML = `<details open><summary>Node health</summary><div style="margin-top:10px">${rows}</div></details>`;
 }
 
@@ -419,7 +468,6 @@ function countMismatchesById(primaryList, otherLists){
   const mismById = new Map();
   const primSet = new Set(primaryList.map(a=>a.account_id));
   for(const a of primaryList) mismById.set(a.account_id, 0);
-
   for(const other of otherLists){
     const set = new Set((other||[]).map(a=>a.account_id));
     for(const id of primSet){
@@ -429,29 +477,6 @@ function countMismatchesById(primaryList, otherLists){
     }
   }
   return mismById;
-}
-
-function renderTVM(stats){
-  // Future-proof:
-  // If node returns { tvm_value, gdp_anchor, she_ecf, yearly_cap, ... } we show them.
-  const tvm = stats.tvm_value ?? stats.tvm ?? null;
-  const gdp = stats.gdp_anchor ?? stats.gdp ?? null;
-  const she = stats.she_ecf ?? stats.ecf ?? null;
-
-  if(tvm === null && gdp === null && she === null){
-    $('tvmPanel').textContent = "No TVM fields returned yet. Add them to /v1/explorer/stats and this panel will auto-populate.";
-    return;
-  }
-
-  $('tvmPanel').innerHTML = `
-    <div class="kv">
-      <b>tvm_value</b> <span class="mono">${escapeHtml(String(tvm ?? "—"))}</span>
-      <b>gdp_anchor</b> <span class="mono">${escapeHtml(String(gdp ?? "—"))}</span>
-      <b>she_ecf</b> <span class="mono">${escapeHtml(String(she ?? "—"))}</span>
-      <b>yearly_cap</b> <span class="mono">${escapeHtml(String(stats.yearly_cap ?? "—"))}</span>
-    </div>
-    <div class="muted2 small" style="margin-top:8px">This is a view-only layer. Logic stays in your node.</div>
-  `;
 }
 
 async function loadDashboard(){
@@ -500,14 +525,14 @@ async function loadDashboard(){
     </details>
   `;
 
-  // TVM layer display
-  renderTVM(primary.data);
-
   cursor = 0;
   await loadAccounts();
 
   $('status').textContent = 'OK';
   setTop('Healthy', 'ok');
+
+  // auto refresh ownership graph
+  await refreshSegments();
 }
 
 async function loadAccounts(){
@@ -660,6 +685,219 @@ async function quickTest(){
   else setTop('Primary failed', 'bad');
 }
 
+/** -------- Segment Ownership Graph -------- */
+
+function normalizeSegmentsPayload(j){
+  // Support: {segments:[...]} or {results:[...]}
+  const segs = j.segments || j.results || [];
+  return Array.isArray(segs) ? segs : [];
+}
+
+async function fetchAllSegments(primaryNode, totalHint){
+  // Best-effort paginator for /v1/explorer/segments
+  // Tries until empty page or cursor stops advancing.
+  const out = [];
+  const pageLimit = 500;
+  let cur = 0;
+  let loops = 0;
+
+  while(loops < 50){
+    loops++;
+    const r = await safeApi(primaryNode, `/v1/explorer/segments?limit=${pageLimit}&cursor=${cur}`);
+    if(!r.ok){
+      // if endpoint doesn't exist, throw to show clear UI message
+      throw new Error(r.error || "segments endpoint failed");
+    }
+    const segs = normalizeSegmentsPayload(r.data);
+    if(segs.length === 0) break;
+    out.push(...segs);
+
+    // next cursor support
+    const next = r.data.next_cursor;
+    if(next === undefined || next === null){
+      // no cursor info => stop after first page
+      break;
+    }
+    if(Number(next) === Number(cur)) break;
+    cur = Number(next);
+
+    if(totalHint && out.length >= totalHint) break;
+  }
+
+  return out;
+}
+
+function buildOwnershipAnalytics(segments){
+  // Expected fields per segment:
+  // origin_account_id, segment_no, current_account_id, previous_account_id, last_utc_ms, counter
+  const byOwner = new Map();
+  const byOrigin = new Map();
+  const origins = new Set();
+  const owners = new Set();
+
+  for(const s of segments){
+    const o = String(s.origin_account_id ?? "");
+    const curr = String(s.current_account_id ?? "");
+    if(!o || !curr) continue;
+
+    origins.add(o);
+    owners.add(curr);
+
+    byOwner.set(curr, (byOwner.get(curr)||0) + 1);
+
+    if(!byOrigin.has(o)) byOrigin.set(o, []);
+    byOrigin.get(o).push(s);
+  }
+
+  // Heat matrix: origin x owner counts
+  const originList = [...origins].sort();
+  const ownerList = [...owners].sort();
+  const heat = new Map(); // key `${origin}||${owner}` -> count
+  for(const s of segments){
+    const o = String(s.origin_account_id ?? "");
+    const curr = String(s.current_account_id ?? "");
+    if(!o || !curr) continue;
+    const k = o + "||" + curr;
+    heat.set(k, (heat.get(k)||0) + 1);
+  }
+
+  const leaders = [...byOwner.entries()].sort((a,b)=>b[1]-a[1]);
+
+  return { byOwner, byOrigin, originList, ownerList, heat, leaders };
+}
+
+function renderLeaders(leaders){
+  if(leaders.length === 0){
+    $('leaders').innerHTML = `<div class="muted">No owner data.</div>`;
+    return;
+  }
+  const top = leaders.slice(0,10);
+  const rows = top.map(([id,count],i)=>`
+    <div class="mono" style="padding:8px 0;border-bottom:1px dashed var(--border)">
+      <span class="muted2">#${i+1}</span> <b>${escapeHtml(id)}</b>
+      <span class="muted2"> · segments</span> <span class="ok">${count}</span>
+    </div>
+  `).join('');
+  $('leaders').innerHTML = `<div>${rows}</div>`;
+}
+
+function renderDistribution(byOwner){
+  const entries = [...byOwner.entries()].sort((a,b)=>b[1]-a[1]);
+  if(entries.length === 0){
+    $('dist').innerHTML = `<div class="muted">No distribution data.</div>`;
+    return;
+  }
+  const max = entries[0][1] || 1;
+
+  const bars = entries.slice(0,12).map(([id,count])=>{
+    const pct = Math.max(2, Math.round((count/max)*100));
+    return `
+      <div class="barRow">
+        <div class="mono">${escapeHtml(id)}</div>
+        <div class="barTrack"><div class="barFill" style="width:${pct}%"></div></div>
+        <div class="mono right">${count}</div>
+      </div>
+    `;
+  }).join('');
+
+  $('dist').innerHTML = `<div class="bars">${bars}</div>`;
+}
+
+function renderOriginMap(byOrigin){
+  const origins = [...byOrigin.keys()].sort();
+  if(origins.length === 0){
+    $('originMap').innerHTML = `<div class="muted">No origin map data.</div>`;
+    return;
+  }
+
+  const blocks = origins.map(origin=>{
+    const segs = byOrigin.get(origin).slice().sort((a,b)=>(a.segment_no??0)-(b.segment_no??0));
+    const lines = segs.map(s=>{
+      const sn = s.segment_no ?? "?";
+      const prev = s.previous_account_id ?? "—";
+      const curr = s.current_account_id ?? "—";
+      const utc = fmtMs(s.last_utc_ms);
+      const ctr = s.counter ?? 0;
+      return `<div class="mono muted2">seg ${escapeHtml(String(sn))}: <span class="muted2">prev</span> ${escapeHtml(String(prev))} → <span class="ok">curr</span> ${escapeHtml(String(curr))} <span class="muted2">· ctr</span> ${escapeHtml(String(ctr))} <span class="muted2">·</span> ${escapeHtml(String(utc||""))}</div>`;
+    }).join("");
+
+    return `
+      <div style="padding:12px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.02);margin-bottom:10px">
+        <div class="mono"><b>Origin:</b> ${escapeHtml(origin)} <span class="muted2">· segments</span> <span class="ok">${segs.length}</span></div>
+        <div style="margin-top:8px">${lines}</div>
+      </div>
+    `;
+  }).join("");
+
+  $('originMap').innerHTML = blocks;
+}
+
+function renderHeatMatrix(originList, ownerList, heat){
+  const container = $('heat');
+  container.innerHTML = "";
+
+  if(originList.length === 0 || ownerList.length === 0){
+    container.innerHTML = `<div class="muted">No heat data.</div>`;
+    return;
+  }
+
+  // Build a compact matrix: each origin row shows owners with counts > 0
+  const rows = originList.map(origin=>{
+    const hits = ownerList
+      .map(owner=>({ owner, count: heat.get(origin+"||"+owner) || 0 }))
+      .filter(x=>x.count>0)
+      .sort((a,b)=>b.count-a.count);
+
+    const cells = (hits.length ? hits : [{owner:"(none)",count:0}]).slice(0,12).map(x=>`
+      <div class="heatCell">
+        <div class="mono"><b>${escapeHtml(origin)}</b> → ${escapeHtml(x.owner)}</div>
+        <div class="mono muted2">count: <span class="ok">${x.count}</span></div>
+      </div>
+    `).join("");
+
+    return cells;
+  }).join("");
+
+  // dynamic columns
+  container.style.gridTemplateColumns = "repeat(auto-fit, minmax(240px, 1fr))";
+  container.innerHTML = rows;
+}
+
+async function refreshSegments(){
+  const nodes = computeNodes();
+  const primary = nodes[0];
+
+  $('segStatus').textContent = "Loading segments from primary…";
+  $('segCount').textContent = "0";
+  $('leaders').innerHTML = "";
+  $('dist').innerHTML = "";
+  $('originMap').innerHTML = "";
+  $('heat').innerHTML = "";
+  $('rawSeg').textContent = "";
+
+  // Get total hint (optional)
+  const stats = await safeApi(primary, "/v1/explorer/stats");
+  const totalHint = (stats.ok && Number.isFinite(Number(stats.data.total_segments))) ? Number(stats.data.total_segments) : null;
+
+  try{
+    const segs = await fetchAllSegments(primary, totalHint);
+    $('segCount').textContent = String(segs.length);
+
+    $('rawSeg').textContent = JSON.stringify(segs.slice(0,200), null, 2) + (segs.length>200 ? "\n\n…(truncated)" : "");
+
+    $('segStatus').innerHTML = `<span class="ok">OK</span> Loaded ${segs.length} segment(s) from <span class="mono">${escapeHtml(primary)}</span>`;
+
+    const a = buildOwnershipAnalytics(segs);
+    renderLeaders(a.leaders);
+    renderDistribution(a.byOwner);
+    renderOriginMap(a.byOrigin);
+    renderHeatMatrix(a.originList, a.ownerList, a.heat);
+
+  }catch(e){
+    $('segStatus').innerHTML = `<span class="bad">Segments not available</span> · ${escapeHtml(String(e.message||e))}<div class="muted2 small" style="margin-top:6px">Expected endpoint: <span class="mono">/v1/explorer/segments</span>. If yours differs, tell me the real path and I’ll wire it.</div>`;
+  }
+}
+
 /** Buttons */
 $('load').onclick = loadDashboard;
 $('quickTest').onclick = quickTest;
@@ -672,14 +910,12 @@ $('next').onclick = async ()=>{ cursor += limit; await loadAccounts(); };
 $('prev').onclick = async ()=>{ cursor = Math.max(0, cursor - limit); await loadAccounts(); };
 $('viewAccount').onclick = ()=>viewAccount($('accountSearch').value.trim());
 $('serialBtn').onclick = lookupSerial;
+$('refreshSegments').onclick = refreshSegments;
 
-/**
- * ✅ AUTO LOAD on page open (your requirement)
- */
+/** Auto-load on open */
 window.addEventListener("DOMContentLoaded", async ()=>{
   await loadDashboard();
 });
 </script>
-
 </body>
 </html>
