@@ -48,13 +48,13 @@
         var(--bg);
       color:var(--text);
     }
-    .wrap{max-width:1280px;margin:28px auto;padding:0 18px}
+    .wrap{max-width:1200px;margin:28px auto;padding:0 18px}
     header{
       display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;
       margin-bottom:16px;
     }
     h1{margin:0;font-size:28px;letter-spacing:.2px}
-    .subtitle{color:var(--muted);font-size:13px;margin-top:6px;max-width:950px}
+    .subtitle{color:var(--muted);font-size:13px;margin-top:6px}
     .pill{
       display:inline-flex;align-items:center;gap:8px;
       padding:8px 10px;border:1px solid var(--border);
@@ -88,9 +88,9 @@
     .muted{color:var(--muted)}
     .muted2{color:var(--muted2)}
     .mono{font-family:var(--mono)}
-    .ok{color:var(--good);font-weight:800}
-    .bad{color:var(--bad);font-weight:800}
-    .warn{color:var(--warn);font-weight:800}
+    .ok{color:var(--good);font-weight:700}
+    .bad{color:var(--bad);font-weight:700}
+    .warn{color:var(--warn);font-weight:700}
 
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .row.space{justify-content:space-between}
@@ -119,7 +119,7 @@
       background:linear-gradient(180deg, rgba(106,168,255,.22), rgba(106,168,255,.08));
       color:var(--text);
       cursor:pointer;
-      font-weight:800;
+      font-weight:700;
       letter-spacing:.15px;
       transition:transform .05s ease, filter .2s ease;
       user-select:none;
@@ -128,10 +128,7 @@
     button:active{transform:translateY(1px)}
     button.secondary{
       background:rgba(255,255,255,.03);
-      font-weight:700;
-    }
-    button.danger{
-      background:linear-gradient(180deg, rgba(255,77,77,.18), rgba(255,77,77,.06));
+      font-weight:600;
     }
 
     .kv{
@@ -149,7 +146,7 @@
       margin-top:12px;
       padding-top:10px;
     }
-    summary{cursor:pointer;color:var(--muted);font-weight:800}
+    summary{cursor:pointer;color:var(--muted);font-weight:700}
     summary::-webkit-details-marker{display:none}
 
     table{
@@ -187,27 +184,27 @@
       background:rgba(255,255,255,.03);
       color:var(--muted);
       font-size:12px;
-      user-select:none;
     }
     .split{
       display:grid;
       grid-template-columns: 1fr 1fr;
       gap:10px;
     }
-    @media (max-width: 820px){
+    @media (max-width: 640px){
       .split{grid-template-columns:1fr}
     }
-
-    .hint{
-      padding:10px 12px;border:1px solid var(--border);
-      border-radius:12px;background:rgba(255,255,255,.02);
-      color:var(--muted);
-      font-size:12px;
-      line-height:1.35;
+    .bars{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+    .bar{
+      border:1px solid var(--border);
+      border-radius:12px;
+      overflow:hidden;
+      background:rgba(255,255,255,.02);
     }
-
-    /* we purposely DO NOT show the hardcoded primary anywhere */
-    .hiddenPrimaryNote{display:none !important}
+    .bar > div{
+      height:10px;
+      background:linear-gradient(90deg, rgba(106,168,255,.55), rgba(47,230,124,.45));
+    }
+    .barlabel{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);margin-bottom:4px}
   </style>
 </head>
 
@@ -216,9 +213,7 @@
   <header>
     <div>
       <h1>BalanceChain Explorer</h1>
-      <div class="subtitle">
-        State-only explorer (accounts + segments). Shows <b>unlocked vs expected vs remaining + next unlock</b>. Optional cross-check nodes.
-      </div>
+      <div class="subtitle">State-only explorer (accounts + segments). Shows <b>unlocked vs expected vs remaining</b> + <b>next unlock</b>. Optional cross-check nodes.</div>
     </div>
     <div class="pill" id="topPill">
       <span class="dot warn"></span>
@@ -230,12 +225,12 @@
     <div class="card">
       <h2>Extra Node Endpoints (optional)</h2>
       <div class="muted small">
-        Add extra nodes here (one per line). The <b>primary</b> is hardcoded and auto-loaded.
-        When you click <b>Load Dashboard</b>, we use: primary + these nodes for cross-check.
+        Add extra nodes here (one per line). The <b>primary is hardcoded and auto-loaded</b>.
+        When you click <b>Load Dashboard</b>, we use: <b>primary + these nodes</b> for cross-check.
       </div>
 
       <div style="margin-top:10px">
-        <textarea id="nodesExtra" spellcheck="false" placeholder="(Optional) add endpoints here…
+        <textarea id="nodes" spellcheck="false" placeholder="(Optional) add endpoints here...
 Example:
 https://another-node.workers.dev
 https://backup-node.workers.dev"></textarea>
@@ -244,7 +239,7 @@ https://backup-node.workers.dev"></textarea>
       <div class="row" style="margin-top:10px">
         <button id="load">Load Dashboard</button>
         <button class="secondary" id="quickTest">Quick Test</button>
-        <button class="secondary" id="reset">Reset Extras</button>
+        <button class="secondary" id="resetExtras">Reset Extras</button>
         <span class="muted" id="status"></span>
       </div>
 
@@ -253,7 +248,7 @@ https://backup-node.workers.dev"></textarea>
 
     <div class="card" id="global">
       <h2>Network Summary</h2>
-      <div class="muted">Auto-loading…</div>
+      <div class="muted">Auto-loading primary…</div>
     </div>
   </div>
 
@@ -307,7 +302,9 @@ https://backup-node.workers.dev"></textarea>
         </thead>
         <tbody></tbody>
       </table>
-      <div class="muted2 small" style="margin-top:10px">Tip: click a row to open account summary.</div>
+      <div class="muted2 small" style="margin-top:10px">
+        Tip: click a row to open account summary.
+      </div>
     </div>
   </div>
 
@@ -315,59 +312,36 @@ https://backup-node.workers.dev"></textarea>
     <div class="row space">
       <div>
         <h2 style="margin:0">Segment Ownership Graph</h2>
-        <div class="muted small">
-          Origin → current owner map · owner distribution · top holders.
-          <span class="muted2">(Requires node endpoint: <span class="mono">GET /v1/explorer/segments</span>)</span>
-        </div>
+        <div class="muted small">Origin → current owner map · owner distribution · top holders.</div>
       </div>
       <div class="row">
-        <button class="secondary" id="graphRefresh">Refresh</button>
-        <span class="tag">segments scanned: <span id="graphCount" class="mono">0</span></span>
+        <button class="secondary" id="refreshGraph">Refresh Graph</button>
       </div>
-    </div>
-
-    <div id="graphOut" class="hint" style="margin-top:12px">
-      Loading graph…
     </div>
 
     <div class="split" style="margin-top:12px">
       <div>
-        <h3 style="margin:0 0 8px 0;font-size:13px;color:var(--muted)">Top holders</h3>
-        <table id="topHoldersTbl">
-          <thead>
-            <tr>
-              <th>account_id</th>
-              <th class="right">owned</th>
-              <th class="right">% of scanned</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="muted small"><b>Origin → Owner edges</b></div>
+        <div id="edgesOut" style="margin-top:10px"></div>
       </div>
       <div>
-        <h3 style="margin:0 0 8px 0;font-size:13px;color:var(--muted)">Origin → current owner (sample)</h3>
-        <table id="originMapTbl">
-          <thead>
-            <tr>
-              <th>origin</th>
-              <th>current owner</th>
-              <th class="right">count</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="muted small"><b>Top holders</b></div>
+        <div id="leadersOut" style="margin-top:10px"></div>
+        <div style="margin-top:14px">
+          <div class="muted small"><b>Owner distribution</b></div>
+          <div id="distOut" class="bars"></div>
+        </div>
       </div>
     </div>
   </div>
-
 </div>
 
 <script>
-/** ===========================
- *  PRIMARY (HARD CODED, INVISIBLE)
- *  =========================== */
-const PRIMARY_NODE = "https://balancechain-node.rr-rshemodel.workers.dev"; // no trailing slash
-const EXTRA_STORAGE_KEY = "balancechain_extras_v1";
+/**
+ * PRIMARY NODE (HARD-CODED + HIDDEN)
+ * IMPORTANT: this value is never shown in the UI.
+ */
+const PRIMARY_NODE = "https://balancechain-node.rr-rshemodel.workers.dev";
 
 let cursor = 0;
 let limit = 50;
@@ -392,30 +366,16 @@ function normNode(u){
   return u.trim().replace(/\/+$/,'');
 }
 
-function loadExtrasFromStorage(){
-  const raw = localStorage.getItem(EXTRA_STORAGE_KEY) || "";
-  $('nodesExtra').value = raw;
+function getExtras(){
+  const lines = ($('nodes').value || '').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  return [...new Set(lines.map(normNode))];
 }
 
-function saveExtrasToStorage(){
-  localStorage.setItem(EXTRA_STORAGE_KEY, $('nodesExtra').value || "");
-}
-
+/** Primary + extras (extras optional) */
 function getNodes(){
-  // primary always first (but never shown)
-  const extra = ($('nodesExtra').value || '').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  const all = [PRIMARY_NODE, ...extra.map(normNode)];
-  // de-dup while preserving order
-  const out = [];
-  const seen = new Set();
-  for(const n of all){
-    const k = normNode(n);
-    if(!k) continue;
-    if(seen.has(k)) continue;
-    seen.add(k);
-    out.push(k);
-  }
-  return out;
+  const extras = getExtras();
+  const nodes = [normNode(PRIMARY_NODE), ...extras];
+  return [...new Set(nodes)];
 }
 
 async function api(node, path){
@@ -423,13 +383,13 @@ async function api(node, path){
   const r = await fetch(u);
   let j;
   try { j = await r.json(); } catch { throw new Error(`Non-JSON from ${u}`); }
-  if(!j.ok) throw new Error(j.error || `API error from ${u}`);
+  if(!j || j.ok !== true) throw new Error((j && j.error) ? j.error : `API error from ${u}`);
   return j;
 }
 
 async function safeApi(node, path){
   try { return { ok:true, data: await api(node, path) }; }
-  catch (e) { return { ok:false, error:String(e.message||e) }; }
+  catch (e) { return { ok:false, error:String(e && e.message ? e.message : e) }; }
 }
 
 function escapeHtml(s){
@@ -441,58 +401,56 @@ function escapeHtml(s){
 function renderHealth(health){
   const el = $('health');
   const rows = health.map((h, idx)=>{
+    const label = idx === 0 ? `<span class="ok">PRIMARY</span>` : `<span class="muted">EXTRA</span>`;
     const st = h.ok ? `<span class="ok">OK</span>` : `<span class="bad">DOWN</span>`;
-    const role = (idx===0) ? `<span class="ok">PRIMARY</span> · ` : ``;
     const meta = h.ok
       ? `<span class="muted">genesis ${fmtMs(h.data.genesis_utc_ms)} · chain <span class="mono">${h.data.chain_id}</span> · schema <span class="mono">${h.data.schema}</span></span>`
       : `<span class="muted">${escapeHtml(h.error)}</span>`;
-    return `<div class="mono">${role}${st} ${escapeHtml(h.node)} <span style="margin-left:8px">${meta}</span></div>`;
+
+    // DO NOT show primary node URL
+    const shownNode = idx === 0 ? `<span class="mono">(hidden)</span>` : `<span class="mono">${escapeHtml(h.node)}</span>`;
+
+    return `<div class="mono">${label} · ${st} ${shownNode} <span style="margin-left:8px">${meta}</span></div>`;
   }).join('');
 
   el.innerHTML = `<details open><summary>Node health</summary><div style="margin-top:10px">${rows}</div></details>`;
 }
 
-function diffSummary(a, b){
-  // strict compare of critical fields for mismatches
-  if(!a || !b) return true;
-  const keys = ["unlocked_segments_count","expected_allowed_to_date","remaining","next_unlock_utc_ms","reclaim_nonce"];
-  for(const k of keys){
-    if((a[k] ?? null) !== (b[k] ?? null)) return true;
+function countMismatchesById(primaryList, otherLists){
+  const mismById = new Map();
+  const primSet = new Set(primaryList.map(a=>a.account_id));
+  for(const a of primaryList) mismById.set(a.account_id, 0);
+
+  for(const other of otherLists){
+    const set = new Set((other||[]).map(a=>a.account_id));
+    for(const id of primSet){
+      if(!set.has(id)){
+        mismById.set(id, (mismById.get(id)||0) + 1);
+      }
+    }
   }
-  return false;
+  return mismById;
 }
 
 async function loadDashboard(){
-  saveExtrasToStorage();
-
   const nodes = getNodes();
-  $('status').textContent = 'Loading…';
+  $('status').textContent = 'Loading...';
   setTop('Loading…', 'warn');
 
-  const health = await Promise.all(nodes.map(async (n)=>{
+  const health = await Promise.all(nodes.map(async (n)=> {
     const r = await safeApi(n, '/v1/node/info');
     if(r.ok) return { node:n, ok:true, data:r.data };
     return { node:n, ok:false, error:r.error };
   }));
   renderHealth(health);
 
-  const primaryHealth = health[0];
-  if(!primaryHealth || !primaryHealth.ok){
-    $('global').innerHTML = `<h2>Network Summary</h2>
-      <div class="bad">Primary node is down</div>
-      <div class="muted">${escapeHtml(primaryHealth?.error || "Unknown error")}</div>`;
-    $('status').textContent = '';
-    setTop('Primary down', 'bad');
-    return;
-  }
-
   const stats = await Promise.all(nodes.map(async (n)=>({ node:n, ...(await safeApi(n, '/v1/explorer/stats')) })));
   const primary = stats[0];
 
   if(!primary.ok){
-    $('global').innerHTML = `<h2>Network Summary</h2><div class="bad">Primary stats failed</div><div class="muted">${escapeHtml(primary.error)}</div>`;
+    $('global').innerHTML = `<h2>Network Summary</h2><div class="bad">Primary node is down</div><div class="muted">${escapeHtml(primary.error)}</div>`;
     $('status').textContent = '';
-    setTop('Primary failed', 'bad');
+    setTop('Primary down', 'bad');
     return;
   }
 
@@ -503,21 +461,21 @@ async function loadDashboard(){
     s.genesis_utc_ms !== primary.data.genesis_utc_ms
   ).length;
 
+  const caps = primary.data.caps || {};
+  const capsText = (caps && (caps.initial!=null || caps.per_day!=null || caps.per_month!=null || caps.per_year!=null))
+    ? `init ${caps.initial ?? 0} · day ${caps.per_day ?? 0} · month ${caps.per_month ?? 0} · year ${caps.per_year ?? 0}`
+    : `initial ${primary.data.initial_unlocked ?? 0} · yearly ${primary.data.yearly_cap ?? 0}`;
+
   $('global').innerHTML = `
     <h2>Network Summary</h2>
     <div class="kv">
+      <b>Primary node</b> <span class="mono">(hidden)</span>
       <b>chain_id</b> <span class="mono">${escapeHtml(primary.data.chain_id)}</span>
       <b>genesis</b> <span class="mono">${escapeHtml(fmtMs(primary.data.genesis_utc_ms))}</span>
-      <b>accounts</b> <span>${escapeHtml(primary.data.total_accounts)} ${mism ? `<span class="bad"> · mismatch on ${mism} node(s)</span>` : `<span class="ok"> · consistent</span>`}</span>
-      <b>segments</b> <span>${escapeHtml(primary.data.total_segments)}</span>
+      <b>accounts</b> <span>${escapeHtml(String(primary.data.total_accounts))} ${mism ? `<span class="bad"> · mismatch on ${mism} node(s)</span>` : `<span class="ok"> · consistent</span>`}</span>
+      <b>segments</b> <span>${escapeHtml(String(primary.data.total_segments))}</span>
       <b>now</b> <span class="mono">${escapeHtml(fmtMs(primary.data.now_ms))}</span>
-      <b>caps</b>
-      <span class="mono">
-        init ${escapeHtml(primary.data.caps?.initial ?? primary.data.initial_unlocked ?? "?")} ·
-        day ${escapeHtml(primary.data.caps?.per_day ?? "?")} ·
-        month ${escapeHtml(primary.data.caps?.per_month ?? "?")} ·
-        year ${escapeHtml(primary.data.caps?.per_year ?? primary.data.yearly_cap ?? "?")}
-      </span>
+      <b>caps</b> <span class="mono">${escapeHtml(capsText)}</span>
     </div>
     <details>
       <summary>Raw primary stats</summary>
@@ -527,7 +485,7 @@ async function loadDashboard(){
 
   cursor = 0;
   await loadAccounts();
-  await refreshGraph(); // best-effort
+  await loadGraph();
   $('status').textContent = 'OK';
   setTop('Healthy', 'ok');
 }
@@ -539,7 +497,6 @@ async function loadAccounts(){
 
   const page = await Promise.all(nodes.map(async (n)=>({ node:n, ...(await safeApi(n, `/v1/explorer/accounts?limit=${limit}&cursor=${cursor}`)) })));
   const primary = page[0];
-
   const tbody = $('tbl').querySelector('tbody');
   tbody.innerHTML = '';
 
@@ -549,41 +506,31 @@ async function loadAccounts(){
   }
 
   const primaryAccounts = primary.data.accounts || primary.data.results || [];
+  const otherLists = page.slice(1).filter(p=>p.ok).map(p => (p.data.accounts || p.data.results || []));
+  const mismById = countMismatchesById(primaryAccounts, otherLists);
+
   if(primaryAccounts.length === 0){
     tbody.innerHTML = `<tr><td colspan="6" class="muted">No accounts yet.</td></tr>`;
     return;
   }
 
-  // Build other-node maps by account_id (for mismatch detection)
-  const otherMaps = page.slice(1).map(p=>{
-    if(!p.ok) return null;
-    const list = p.data.accounts || p.data.results || [];
-    const m = new Map();
-    for(const a of list) m.set(a.account_id, a);
-    return m;
-  });
-
   for(const a of primaryAccounts){
     const id = a.account_id;
-    const others = otherMaps.map(m => m ? m.get(id) : null);
-    let mism = 0;
-    for(const o of others){
-      if(!o) continue;
-      // Compare time-based fields if node returns them, otherwise compare what exists
-      const keys = ["unlocked_segments_count","expected_allowed_to_date","remaining","next_unlock_utc_ms"];
-      for(const k of keys){
-        if((a[k] ?? null) !== (o[k] ?? null)){ mism++; break; }
-      }
-    }
+    const mism = mismById.get(id) || 0;
+
+    const unlocked = a.unlocked ?? a.unlocked_segments ?? 0;
+    const expected = a.expected ?? a.expected_unlocked ?? 0;
+    const remaining = a.remaining ?? a.remaining_to_unlock ?? 0;
+    const nextUnlock = a.next_unlock_utc_ms ?? a.next_unlock_ms ?? null;
 
     const tr = document.createElement('tr');
     tr.className = 'click';
     tr.innerHTML = `
       <td class="mono">${escapeHtml(id)}</td>
-      <td class="right mono">${escapeHtml(a.unlocked_segments_count ?? "—")}</td>
-      <td class="right mono">${escapeHtml(a.expected_allowed_to_date ?? "—")}</td>
-      <td class="right mono">${escapeHtml(a.remaining ?? "—")}</td>
-      <td class="mono">${escapeHtml(a.next_unlock_utc_ms ? fmtMs(a.next_unlock_utc_ms) : "—")}</td>
+      <td class="right mono">${escapeHtml(String(unlocked))}</td>
+      <td class="right mono">${escapeHtml(String(expected))}</td>
+      <td class="right mono">${escapeHtml(String(remaining))}</td>
+      <td class="mono">${escapeHtml(fmtMs(nextUnlock))}</td>
       <td class="right">${mism ? `<span class="bad">${mism}</span>` : `<span class="ok">0</span>`}</td>
     `;
     tr.onclick = ()=>viewAccount(id);
@@ -596,54 +543,53 @@ async function viewAccount(accountId){
   if(!accountId){ $('account').innerHTML=''; return; }
 
   $('account').innerHTML = `<div class="muted">Loading…</div>`;
+
   const results = await Promise.all(nodes.map(async (n)=>({ node:n, ...(await safeApi(n, `/v1/explorer/accounts/${encodeURIComponent(accountId)}/summary`)) })));
 
   const okSummaries = results.filter(r=>r.ok).map(r=>r.data);
-  let mism = 0;
-  if(okSummaries.length > 1){
-    const p = okSummaries[0];
-    mism = okSummaries.slice(1).filter(x => diffSummary(p, x)).length;
-  }
+  const mism = (okSummaries.length > 1)
+    ? okSummaries.slice(1).filter(x => JSON.stringify(x) !== JSON.stringify(okSummaries[0])).length
+    : 0;
 
-  const primary = results[0].ok ? results[0].data : null;
+  const rows = results.map((r, idx)=>{
+    const label = idx === 0 ? `<span class="ok">PRIMARY</span>` : `<span class="muted">EXTRA</span>`;
 
-  const rows = results.map(r=>{
     if(!r.ok){
-      return `<div class="mono"><span class="bad">DOWN</span> ${escapeHtml(r.node)} <span class="muted">${escapeHtml(r.error)}</span></div>`;
+      const shownNode = idx === 0 ? `(hidden)` : escapeHtml(r.node);
+      return `<div class="mono">${label} <span class="bad">DOWN</span> ${shownNode} <span class="muted">${escapeHtml(r.error)}</span></div>`;
     }
-    const s = r.data;
+
+    const s = r.data || {};
+    const acc = s.account || {};
+    const unlock = s.unlock || {};
+    const shownNode = idx === 0 ? `(hidden)` : escapeHtml(r.node);
+
     return `
       <div class="mono">
-        <span class="ok">OK</span> ${escapeHtml(r.node)}
+        ${label} <span class="ok">OK</span> ${shownNode}
         <span class="muted">
-          · unlocked=${escapeHtml(s.unlocked_segments_count ?? "—")}
-          · expected=${escapeHtml(s.expected_allowed_to_date ?? "—")}
-          · remaining=${escapeHtml(s.remaining ?? "—")}
-          · next=${escapeHtml(s.next_unlock_utc_ms ? fmtMs(s.next_unlock_utc_ms) : "—")}
+          · unlocked=${escapeHtml(String(unlock.unlocked ?? 0))}
+          · expected=${escapeHtml(String(unlock.expected ?? 0))}
+          · remaining=${escapeHtml(String(unlock.remaining ?? 0))}
+          · next=${escapeHtml(fmtMs(unlock.next_unlock_utc_ms ?? null))}
+          · created=${escapeHtml(fmtMs(acc.created_at_ms))}
         </span>
       </div>
     `;
   }).join('');
 
   $('account').innerHTML = `
-    <div><b>account_id:</b> <span class="mono">${escapeHtml(accountId)}</span>
-      ${mism ? `<span class="bad"> · mismatch on ${mism} node(s)</span>` : `<span class="ok"> · consistent</span>`}
-    </div>
-
-    ${primary ? `
-      <div class="kv" style="margin-top:10px">
-        <b>unlocked</b> <span class="mono">${escapeHtml(primary.unlocked_segments_count ?? "—")}</span>
-        <b>expected</b> <span class="mono">${escapeHtml(primary.expected_allowed_to_date ?? "—")}</span>
-        <b>remaining</b> <span class="mono">${escapeHtml(primary.remaining ?? "—")}</span>
-        <b>next unlock</b> <span class="mono">${escapeHtml(primary.next_unlock_utc_ms ? fmtMs(primary.next_unlock_utc_ms) : "—")}</span>
-        <b>join</b> <span class="mono">${escapeHtml(primary.join_utc_ms ? fmtMs(primary.join_utc_ms) : "—")}</span>
+    <div class="row" style="gap:12px;align-items:flex-start">
+      <div class="stack" style="flex:1">
+        <div><b>account_id:</b> <span class="mono">${escapeHtml(accountId)}</span>
+          ${mism ? `<span class="bad"> · mismatch on ${mism} node(s)</span>` : `<span class="ok"> · consistent</span>`}
+        </div>
+        <details open>
+          <summary>Across nodes</summary>
+          <div style="margin-top:10px">${rows}</div>
+        </details>
       </div>
-    ` : ``}
-
-    <details open>
-      <summary>Across nodes</summary>
-      <div style="margin-top:10px">${rows}</div>
-    </details>
+    </div>
   `;
 }
 
@@ -655,6 +601,7 @@ async function lookupSerial(){
     $('serialOut').innerHTML = '<span class="muted">Enter origin_account_id and segment_no</span>';
     return;
   }
+
   $('serialOut').innerHTML = `<div class="muted">Loading…</div>`;
 
   const path = `/v1/explorer/serial?origin_account_id=${encodeURIComponent(origin)}&segment_no=${encodeURIComponent(no)}`;
@@ -672,17 +619,20 @@ async function lookupSerial(){
     ).length;
   }
 
-  const rows = results.map(r=>{
+  const rows = results.map((r, idx)=>{
+    const label = idx === 0 ? `<span class="ok">PRIMARY</span>` : `<span class="muted">EXTRA</span>`;
+    const shownNode = idx === 0 ? `(hidden)` : escapeHtml(r.node);
+
     if(!r.ok){
-      return `<div class="mono"><span class="bad">DOWN</span> ${escapeHtml(r.node)} <span class="muted">${escapeHtml(r.error)}</span></div>`;
+      return `<div class="mono">${label} <span class="bad">DOWN</span> ${shownNode} <span class="muted">${escapeHtml(r.error)}</span></div>`;
     }
     const seg = r.data.segment;
     if(!seg){
-      return `<div class="mono"><span class="warn">MISS</span> ${escapeHtml(r.node)} <span class="muted">segment not found</span></div>`;
+      return `<div class="mono">${label} <span class="warn">MISS</span> ${shownNode} <span class="muted">segment not found</span></div>`;
     }
     return `
       <div class="mono">
-        <span class="ok">OK</span> ${escapeHtml(r.node)}
+        ${label} <span class="ok">OK</span> ${shownNode}
         <span class="muted">
           · prev=${escapeHtml(seg.previous_account_id)}
           · curr=${escapeHtml(seg.current_account_id)}
@@ -705,133 +655,193 @@ async function lookupSerial(){
 }
 
 async function quickTest(){
-  const nodes = getNodes();
   setTop('Testing…', 'warn');
-  const r = await safeApi(nodes[0], '/v1/node/info');
-  if(r.ok) setTop('Healthy', 'ok');
+  const r = await safeApi(normNode(PRIMARY_NODE), '/v1/node/info');
+  if(r.ok) setTop('Primary reachable', 'ok');
   else setTop('Primary failed', 'bad');
 }
 
-/** ===========================
- *  Segment Ownership Graph
- *  =========================== */
-function renderTableBody(tbody, rowsHtml){
-  tbody.innerHTML = rowsHtml || `<tr><td class="muted" colspan="3">No data</td></tr>`;
-}
+/**
+ * GRAPH
+ * Tries:
+ * 1) /v1/explorer/graph (preferred)
+ * 2) fallback: page through /v1/explorer/segments
+ */
+async function loadGraph(){
+  $('edgesOut').innerHTML = `<div class="muted">Loading graph…</div>`;
+  $('leadersOut').innerHTML = '';
+  $('distOut').innerHTML = '';
 
-async function refreshGraph(){
-  $('graphOut').textContent = 'Loading graph…';
-  $('graphCount').textContent = '0';
-
-  const nodes = getNodes();
-  const primary = nodes[0];
-
-  // We scan segments from node (best effort)
-  // Requires Worker endpoint: GET /v1/explorer/segments?limit=...&cursor=...
-  let cursor = 0;
-  const limit = 500;         // scan in pages
-  const maxPages = 20;       // up to 10k segments scanned max
-  let scanned = 0;
-
-  const ownerCount = new Map();                 // current_owner -> count
-  const originToOwnerCount = new Map();         // "origin|owner" -> count
-
-  for(let page=0; page<maxPages; page++){
-    const res = await safeApi(primary, `/v1/explorer/segments?limit=${limit}&cursor=${cursor}`);
-    if(!res.ok){
-      $('graphOut').innerHTML = `
-        <div><span class="bad">Graph unavailable.</span></div>
-        <div class="muted">Your node does not expose <span class="mono">GET /v1/explorer/segments</span> yet.</div>
-      `;
-      renderTableBody($('topHoldersTbl').querySelector('tbody'), '');
-      renderTableBody($('originMapTbl').querySelector('tbody'), '');
-      return;
-    }
-
-    const segments = res.data.segments || res.data.results || [];
-    if(!Array.isArray(segments) || segments.length === 0) break;
-
-    for(const s of segments){
-      const owner = s.current_account_id || "";
-      const origin = s.origin_account_id || "";
-      if(owner){
-        ownerCount.set(owner, (ownerCount.get(owner)||0)+1);
-      }
-      if(origin && owner){
-        const k = origin + "|" + owner;
-        originToOwnerCount.set(k, (originToOwnerCount.get(k)||0)+1);
-      }
-      scanned++;
-    }
-
-    cursor = Number(res.data.next_cursor ?? (cursor + segments.length));
-    if(!Number.isFinite(cursor)) break;
-    if(segments.length < limit) break;
-  }
-
-  $('graphCount').textContent = String(scanned);
-
-  if(scanned === 0){
-    $('graphOut').innerHTML = `<div class="muted">No segments to graph yet.</div>`;
-    renderTableBody($('topHoldersTbl').querySelector('tbody'), '');
-    renderTableBody($('originMapTbl').querySelector('tbody'), '');
+  // 1) preferred endpoint
+  const g = await safeApi(normNode(PRIMARY_NODE), '/v1/explorer/graph');
+  if(g.ok){
+    renderGraph(g.data);
     return;
   }
 
-  // Top holders
-  const top = [...ownerCount.entries()].sort((a,b)=>b[1]-a[1]).slice(0, 12);
-  const topRows = top.map(([acc,cnt])=>{
-    const pct = ((cnt / scanned) * 100).toFixed(2);
-    return `
-      <tr>
-        <td class="mono">${escapeHtml(acc)}</td>
-        <td class="right mono">${cnt}</td>
-        <td class="right mono">${pct}%</td>
-      </tr>
-    `;
-  }).join('');
-  renderTableBody($('topHoldersTbl').querySelector('tbody'), topRows);
+  // 2) fallback: segments listing
+  const segments = await fetchAllSegmentsFallback();
+  if(!segments){
+    $('edgesOut').innerHTML = `<div class="bad">Graph unavailable</div><div class="muted small">Need /v1/explorer/graph or /v1/explorer/segments endpoints on node.</div>`;
+    return;
+  }
 
-  // Origin -> owner sample (top pairs)
-  const pairs = [...originToOwnerCount.entries()].sort((a,b)=>b[1]-a[1]).slice(0, 12);
-  const pairRows = pairs.map(([k,cnt])=>{
-    const [origin, owner] = k.split("|");
-    return `
-      <tr>
-        <td class="mono">${escapeHtml(origin)}</td>
-        <td class="mono">${escapeHtml(owner)}</td>
-        <td class="right mono">${cnt}</td>
-      </tr>
-    `;
-  }).join('');
-  renderTableBody($('originMapTbl').querySelector('tbody'), pairRows);
+  const computed = computeGraphFromSegments(segments);
+  renderGraph(computed);
+}
 
-  // Summary text
-  const distinctOwners = ownerCount.size;
-  const distinctOrigins = new Set([...originToOwnerCount.keys()].map(k=>k.split("|")[0])).size;
-  $('graphOut').innerHTML = `
-    <div><span class="ok">Graph ready.</span> <span class="muted">Scanned ${scanned} segments.</span></div>
-    <div class="muted">Distinct owners: <span class="mono">${distinctOwners}</span> · distinct origins: <span class="mono">${distinctOrigins}</span></div>
-  `;
+async function fetchAllSegmentsFallback(){
+  const node = normNode(PRIMARY_NODE);
+  const all = [];
+  let cur = 0;
+  const pageLimit = 500;
+  const maxPages = 40; // up to 20k segments
+  for(let i=0;i<maxPages;i++){
+    const r = await safeApi(node, `/v1/explorer/segments?limit=${pageLimit}&cursor=${cur}`);
+    if(!r.ok) return null;
+    const items = r.data.segments || r.data.results || [];
+    for(const s of items) all.push(s);
+    const next = r.data.next_cursor;
+    if(next === null || next === undefined || next === cur || items.length === 0) break;
+    cur = next;
+  }
+  return all;
+}
+
+function computeGraphFromSegments(segments){
+  // expect each segment item includes:
+  // origin_account_id, segment_no, current_account_id
+  const ownerCount = new Map();
+  const edgeCount = new Map(); // key origin->owner
+  const originCount = new Map();
+
+  for(const s of segments){
+    const origin = s.origin_account_id || s.origin || '';
+    const owner = s.current_account_id || s.current || '';
+    if(!origin || !owner) continue;
+
+    ownerCount.set(owner, (ownerCount.get(owner)||0) + 1);
+    originCount.set(origin, (originCount.get(origin)||0) + 1);
+
+    const k = origin + '→' + owner;
+    edgeCount.set(k, (edgeCount.get(k)||0) + 1);
+  }
+
+  const edges = [...edgeCount.entries()]
+    .map(([k, count])=>{
+      const [origin, owner] = k.split('→');
+      return { origin, owner, count };
+    })
+    .sort((a,b)=>b.count-a.count)
+    .slice(0, 50);
+
+  const leaders = [...ownerCount.entries()]
+    .map(([owner, count])=>({ owner, count }))
+    .sort((a,b)=>b.count-a.count)
+    .slice(0, 20);
+
+  const total = [...ownerCount.values()].reduce((a,b)=>a+b,0) || 0;
+
+  const dist = leaders.slice(0, 10).map(x=>({
+    owner: x.owner,
+    count: x.count,
+    pct: total ? (x.count/total) : 0
+  }));
+
+  return { ok:true, edges, leaders, dist, total_segments: total };
+}
+
+function renderGraph(g){
+  const edges = g.edges || [];
+  const leaders = g.leaders || g.top_holders || [];
+  const dist = g.dist || g.distribution || [];
+
+  // edges
+  if(edges.length === 0){
+    $('edgesOut').innerHTML = `<div class="muted">No edges yet.</div>`;
+  }else{
+    const rows = edges.map(e=>`
+      <tr>
+        <td class="mono">${escapeHtml(e.origin)}</td>
+        <td class="mono">${escapeHtml(e.owner)}</td>
+        <td class="right mono">${escapeHtml(String(e.count ?? 0))}</td>
+      </tr>
+    `).join('');
+    $('edgesOut').innerHTML = `
+      <table>
+        <thead><tr><th>origin</th><th>owner</th><th class="right">segments</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  // leaders
+  if(leaders.length === 0){
+    $('leadersOut').innerHTML = `<div class="muted">No holders yet.</div>`;
+  }else{
+    const rows = leaders.slice(0, 12).map((x,i)=>`
+      <tr>
+        <td class="mono">#${i+1}</td>
+        <td class="mono">${escapeHtml(x.owner || x.account_id || '')}</td>
+        <td class="right mono">${escapeHtml(String(x.count ?? x.segments ?? 0))}</td>
+      </tr>
+    `).join('');
+    $('leadersOut').innerHTML = `
+      <table>
+        <thead><tr><th>rank</th><th>holder</th><th class="right">segments</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  // distribution bars
+  const normalized = dist.length
+    ? dist.map(d=>({ owner: d.owner || d.account_id || '', pct: d.pct ?? 0, count: d.count ?? 0 }))
+    : leaders.slice(0,10).map(x=>({ owner: x.owner || x.account_id || '', count: x.count ?? 0 })).map(x=>x);
+
+  if(!normalized.length){
+    $('distOut').innerHTML = `<div class="muted">No distribution yet.</div>`;
+  }else{
+    const max = Math.max(...normalized.map(x=>Number(x.count||0)), 1);
+    $('distOut').innerHTML = normalized.slice(0,10).map(x=>{
+      const w = Math.max(2, Math.round((Number(x.count||0) / max) * 100));
+      return `
+        <div>
+          <div class="barlabel">
+            <span class="mono">${escapeHtml(x.owner)}</span>
+            <span class="mono">${escapeHtml(String(x.count||0))}</span>
+          </div>
+          <div class="bar"><div style="width:${w}%"></div></div>
+        </div>
+      `;
+    }).join('');
+  }
 }
 
 $('load').onclick = loadDashboard;
 $('quickTest').onclick = quickTest;
-$('reset').onclick = ()=>{
-  $('nodesExtra').value = "";
-  saveExtrasToStorage();
-  loadDashboard();
-};
 $('next').onclick = async ()=>{ cursor += limit; await loadAccounts(); };
 $('prev').onclick = async ()=>{ cursor = Math.max(0, cursor - limit); await loadAccounts(); };
 $('viewAccount').onclick = ()=>viewAccount($('accountSearch').value.trim());
 $('serialBtn').onclick = lookupSerial;
-$('graphRefresh').onclick = refreshGraph;
+$('refreshGraph').onclick = loadGraph;
+$('resetExtras').onclick = ()=>{
+  $('nodes').value = "";
+  localStorage.removeItem("bc_extras");
+  $('status').textContent = 'Extras reset';
+};
 
-// Auto-load on page open (primary hidden, always)
 (function boot(){
-  loadExtrasFromStorage();
-  loadDashboard();
+  // persist extras
+  const saved = localStorage.getItem("bc_extras");
+  if(saved && !$('nodes').value) $('nodes').value = saved;
+
+  $('nodes').addEventListener('input', ()=>{
+    localStorage.setItem("bc_extras", $('nodes').value || "");
+  });
+
+  // AUTO-LOAD on page open
+  Promise.resolve().then(loadDashboard).catch(()=>{});
 })();
 </script>
 </body>
